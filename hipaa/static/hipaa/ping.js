@@ -5,7 +5,7 @@
 $(document).ready(function(){
     // this should be about half of the AUTOMATIC_LOGOUT_AFTER time
     // 5 minutes is reasonable for most configurations
-    var milliseconds_between_pings = HIPAA_MILLISECONDS_BETWEEN_PINGS || 1000*60*5;
+    var milliseconds_between_pings = typeof(HIPAA_MILLISECONDS_BETWEEN_PINGS) === "undefined" ? 1000*60*5 : HIPAA_MILLISECONDS_BETWEEN_PINGS;
     // the date we last detected any activity on the page
     var last_activity = new Date();
     // the last thing a ping went out
