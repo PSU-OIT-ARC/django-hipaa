@@ -1,9 +1,13 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.base import ModelBase
 from ipware.ip import get_real_ip
 
 
 class LogModelField(models.ForeignKey):
+    """
+    This just sets the correct defaults for a foreign key on the log model
+    """
     def __init__(self, to, to_field=None, related_name="+", related_query_name=None,
                  limit_choices_to=None, parent_link=False, on_delete=models.SET_NULL,
                  db_constraint=True, null=True, **kwargs):
@@ -11,17 +15,23 @@ class LogModelField(models.ForeignKey):
                                             limit_choices_to=limit_choices_to, parent_link=parent_link, on_delete=on_delete,
                                             db_constraint=db_constraint, null=null, **kwargs)
 
-    def contribute_to_class(self, cls, name, *args, **kwargs):
-        super(LogModelField, self).contribute_to_class(cls, name, *args, **kwargs)
-        # when a model is deleted, the Foreign Key to it on the Log model will
-        # be nulled out. To preserve some historical information, we add
-        # another field to the Log model that stores the PK of the field.
+
+class LogMeta(ModelBase):
+    """
+    Adds in the extra (hidden) "name_pk" fields to the model class for all the
+    LogModelFields
+    """
+    def _prepare(cls):
         if not cls._meta.abstract:
-            model_pk_field = models.CharField(max_length=255, null=True, default=None)
-            model_pk_field.contribute_to_class(cls, name + "_pk", *args, **kwargs)
+            for field in cls._meta.fields:
+                if isinstance(field, LogModelField):
+                    model_pk_field = models.CharField(max_length=255, null=True, default=None)
+                    model_pk_field.contribute_to_class(cls, field.name + "_pk")
+
+        return super()._prepare()
 
 
-class Log(models.Model):
+class Log(models.Model, metaclass=LogMeta):
     CREATED = "created"
     EDITED = "edited"
     DELETED = "deleted"
