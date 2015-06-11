@@ -10,6 +10,10 @@ $(document).ready(function(){
     var last_activity = new Date();
     // the last thing a ping went out
     var last_ping = new Date();
+    // when the state goes from authenticated to unauthenticated, we should
+    // reload the page, since that will redirect them to the login page (since
+    // they got logged out)
+    var state = "unauthenticated";
 
     // detect any activity on the page
     $('body').on("mousemove click keyup scroll", function(){
@@ -27,13 +31,14 @@ $(document).ready(function(){
             // will intercept any request
             'url': window.location,
             'headers': {'X-HIPAA-PING': was_activity},
-            'success': function(data){
-                // if the response we get back is not ok, then the session
-                // expired, and we reload the page (which will force a redirect
-                // to the login page)
-                if(data != "ok"){
+            'success': function(new_state){
+                // if there was a transition from being authenticated to being
+                // unauthenticated, then reload the page (which will trigger a
+                // redirect to the login via some Django middleware)
+                if(state == "authenticated" && new_state != "authenticated"){
                     location.reload(true);
                 }
+                state = new_state
             },
         });
         last_ping = new Date();

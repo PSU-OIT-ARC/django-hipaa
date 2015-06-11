@@ -137,7 +137,7 @@ class RateLimitingOnLoginTest(TestCase):
 
 
 class StillAliveMiddlewareTest(TestCase):
-    def test_unauthenticated_users_just_have_HIPAA_LAST_PING_UPDATED(self):
+    def test_unauthenticated_users_just_have_HIPAA_LAST_PING_updated(self):
         # just hitting the middleware without being logged in should just set
         # the HIPAA_LAST_PING session var
         mw = StillAliveMiddleware()
@@ -165,7 +165,7 @@ class StillAliveMiddlewareTest(TestCase):
             self.assertEqual(None, mw.process_request(request))
         self.assertEqual(right_now, request.session["HIPAA_LAST_PING"])
 
-    def test_ping_for_unauthenticated_users_should_just_return_OK(self):
+    def test_ping_for_unauthenticated_users_should_just_return_unauthenticated(self):
         # if the request has the ping header, then the response should just be
         # OK if the user isn't logged in
         mw = StillAliveMiddleware()
@@ -176,7 +176,7 @@ class StillAliveMiddlewareTest(TestCase):
         )
         right_now = 5
         with patch("hipaa.middleware.time.time", return_value=right_now):
-            self.assertEqual("ok", mw.process_request(request).content.decode())
+            self.assertEqual("unauthenticated", mw.process_request(request).content.decode())
 
     def test_authenticated_user_who_hits_the_site_after_AUTOMATIC_LOGOUT_AFTER_should_be_logged_out(self):
         # a logged in user who hits the site after AUTOMATIC_LOGOUT_AFTER
@@ -192,10 +192,10 @@ class StillAliveMiddlewareTest(TestCase):
             with patch("hipaa.middleware.logout") as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertEqual("/login", mw.process_request(request)["Location"])
+                    self.assertEqual(None, mw.process_request(request))
                     self.assertTrue(logout.called)
 
-    def test_pings_after_AUTOMATIC_LOGOUT_AFTER_seconds_should_not_return_ok(self):
+    def test_pings_after_AUTOMATIC_LOGOUT_AFTER_seconds_should_not_return_authenticated(self):
         # if you ping the site after AUTOMATIC_LOGOUT_AFTER then you should be
         # logged out, and the response back should be something other than "ok"
         mw = StillAliveMiddleware()
@@ -204,15 +204,19 @@ class StillAliveMiddlewareTest(TestCase):
             user=Mock(is_authenticated=lambda: True),
             session={"HIPAA_LAST_PING": 0}
         )
+
+        def logout(request):
+            request.user.is_authenticated = lambda: False
+
         right_now = 1+settings.AUTOMATIC_LOGOUT_AFTER.total_seconds()
         with patch("hipaa.middleware.time.time", return_value=right_now):
-            with patch("hipaa.middleware.logout") as logout:
+            with patch("hipaa.middleware.logout", side_effect=logout) as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertNotEqual("ok", mw.process_request(request).content.decode())
+                    self.assertNotEqual("authenticated", mw.process_request(request).content.decode())
                     self.assertTrue(logout.called)
 
-    def test_pings_before_AUTOMATIC_LOGOUT_AFTER_seconds_should_be_ok(self):
+    def test_pings_before_AUTOMATIC_LOGOUT_AFTER_seconds_should_be_authenticated(self):
         # if you ping the site before AUTOMATIC_LOGOUT_AFTER then the response
         # should be OK
         mw = StillAliveMiddleware()
@@ -226,12 +230,10 @@ class StillAliveMiddlewareTest(TestCase):
             with patch("hipaa.middleware.logout") as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertEqual("ok", mw.process_request(request).content.decode())
+                    self.assertEqual("authenticated", mw.process_request(request).content.decode())
                     self.assertFalse(logout.called)
 
     def test_PING_TIMESTAMP_not_updated_when_ping_header_is_not_one(self):
-        # if you ping the site before AUTOMATIC_LOGOUT_AFTER then the response
-        # should be OK
         mw = StillAliveMiddleware()
         request = Mock(
             META={"HTTP_X_HIPAA_PING": "0"},
@@ -243,6 +245,6 @@ class StillAliveMiddlewareTest(TestCase):
             with patch("hipaa.middleware.logout") as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertEqual("ok", mw.process_request(request).content.decode())
+                    self.assertEqual("authenticated", mw.process_request(request).content.decode())
                     self.assertFalse(logout.called)
         self.assertEqual(0, request.session["HIPAA_LAST_PING"])
