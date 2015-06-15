@@ -1,3 +1,9 @@
+"""
+This monkey patches a bunch of the django.contrib.auth forms
+"""
+import gzip
+import os
+import re
 from datetime import timedelta
 
 from django.conf import settings
@@ -9,6 +15,7 @@ from django.utils.timezone import now
 
 from .models import Log
 
+# allow a user to try to login n times per unit of time
 LOGIN_RATE_LIMIT = getattr(settings, "LOGIN_RATE_LIMIT", (20, timedelta(minutes=10)))
 
 
@@ -89,3 +96,37 @@ def log_password_change(self):
     save(self)
 
 SetPasswordForm.save = log_password_change
+
+
+# hook into SetPasswordForm again so we can ensure the password meets certain
+# requirements
+clean_new_password2 = SetPasswordForm.clean_new_password2
+
+password_list_path = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), 'common-passwords.txt.gz'
+)
+
+
+def ensure_safe_password(self):
+    password2 = clean_new_password2(self)
+    if password2:
+        if len(password2) < 8:
+            raise ValidationError("The password must be 8 characters or longer")
+
+        if not re.search("[0-9]", password2):
+            raise ValidationError("The password must have at least one number")
+
+        if not re.search("[A-Za-z]", password2):
+            raise ValidationError("The password must have at least one letter")
+
+        if getattr(self.user, self.user.USERNAME_FIELD) in password2 or (self.user.email and self.user.email in password2):
+            raise ValidationError("The password must not contain your username/email")
+
+        if (self.user.first_name and self.user.first_name in password2) or (self.user.last_name and self.user.last_name in password2):
+            raise ValidationError("The password must not contain your name")
+
+        common_passwords_lines = gzip.open(password_list_path).read().decode('utf-8').splitlines()
+        if password2 in common_passwords_lines:
+            raise ValidationError("The password is too common.")
+
+SetPasswordForm.clean_new_password2 = ensure_safe_password

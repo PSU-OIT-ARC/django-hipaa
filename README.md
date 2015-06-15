@@ -7,7 +7,7 @@ This is a collection of monkey patches and utilties to make a site more HIPAA fr
 - Rate limits the `django.contrib.auth.forms.AuthenticationForm` and resets that rate limit when `django.contrib.auth.forms.SetPasswordForm` is saved.
 - Provides an abstract base model for simple Logging capabilities (which many of this package's features rely on)
 - Automatically logs out a user after a configurable amount of inactivity. A simple JavaScript pinging mechanism is used to prevent logouts when the user is actively engaged on a single page for a long time.
-- Ensures passwords are complex (TODO)
+- Ensures passwords are complex
 - Python 3+ only
 
 # Assumptions
@@ -22,6 +22,8 @@ This is a collection of monkey patches and utilties to make a site more HIPAA fr
     pip install -e this package
 
 After `SessionMiddleware`, `AuthenticationMiddleware` and `MessageMiddleware`, append **`hipaa.middleware.StillAliveMiddleware` to `MIDDLEWARE_CLASSES`**
+
+Add 'hipaa' to INSTALLED_APPS.
 
 Somewhere in your app, create a model that is a subclass of `hipaa.Log`:
 

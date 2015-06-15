@@ -99,7 +99,7 @@ class RateLimitingOnLoginTest(TestCase):
 
         # but if we reset the password...
         user = make(User, username="foo")
-        form = SetPasswordForm(user, {"new_password1": "lame", "new_password2": "lame"})
+        form = SetPasswordForm(user, {"new_password1": "asdfasdf1", "new_password2": "asdfasdf1"})
         self.assertTrue(form.is_valid())
         form.save()
 
@@ -248,3 +248,75 @@ class StillAliveMiddlewareTest(TestCase):
                     self.assertEqual("authenticated", mw.process_request(request).content.decode())
                     self.assertFalse(logout.called)
         self.assertEqual(0, request.session["HIPAA_LAST_PING"])
+
+
+class PasswordChangeTest(TestCase):
+    def test_password_length_no_less_than_8(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "123",
+            "new_password2": "123",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must be 8 characters", str(form.errors['new_password2']))
+
+    def test_password_must_have_one_number(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "abcdefghi",
+            "new_password2": "abcdefghi",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must have at least one number", str(form.errors['new_password2']))
+
+    def test_password_must_have_one_letter(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "123456789",
+            "new_password2": "123456789"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must have at least one letter", str(form.errors['new_password2']))
+
+    def test_password_must_not_contain_username(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "username1",
+            "new_password2": "username1"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must not contain your username/email", str(form.errors['new_password2']))
+
+    def test_password_must_not_contain_email(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "me@example.com1",
+            "new_password2": "me@example.com1"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must not contain your username/email", str(form.errors['new_password2']))
+
+    def test_password_must_not_contain_name(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "first1first",
+            "new_password2": "first1first"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must not contain your name", str(form.errors['new_password2']))
+
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "lastlast1",
+            "new_password2": "lastlast1"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password must not contain your name", str(form.errors['new_password2']))
+
+    def test_password_must_not_be_common(self):
+        user = make(User, first_name="first", last_name="last", email="me@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "password1",
+            "new_password2": "password1"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("The password is too common", str(form.errors['new_password2']))
