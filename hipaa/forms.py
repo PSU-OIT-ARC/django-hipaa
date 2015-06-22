@@ -36,9 +36,9 @@ def get_logger():
 clean = AuthenticationForm.clean
 
 
-def rate_limiting_clean(self):
+def authentication_form_clean(self):
     """
-    This adds rate limiting to the login form
+    This adds rate limiting to the login form and forbids logging in with an @pdx.edu email
     """
     Logger = get_logger()
     # if there was no username, no need to consider a ratelimit
@@ -76,9 +76,12 @@ def rate_limiting_clean(self):
                 % LOGIN_RATE_LIMIT[1].total_seconds()
             )
 
+        if self.cleaned_data["username"].lower().endswith("@pdx.edu"):
+            raise ValidationError("You must sign in with CAS")
+
     return clean(self)
 
-AuthenticationForm.clean = rate_limiting_clean
+AuthenticationForm.clean = authentication_form_clean
 
 
 # hook into the SetPasswordForm (which is used to reset a password), so we can

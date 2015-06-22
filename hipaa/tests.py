@@ -7,7 +7,11 @@ from django.db import models
 from django.test import TestCase
 from model_mommy.mommy import make
 
-from .forms import AuthenticationForm, SetPasswordForm, rate_limiting_clean
+from .forms import (
+    AuthenticationForm,
+    SetPasswordForm,
+    authentication_form_clean,
+)
 from .middleware import StillAliveMiddleware
 from .models import Log, LogModelField
 
@@ -50,13 +54,25 @@ class LogModelFieldTest(TestCase):
         self.assertIn("something_pk", dir(logger))
 
 
+class PDXEmailAddressesRequireCASLogin(TestCase):
+    def test_cas_login_required_for_pdx_emails(self):
+        form = AuthenticationForm(data={"username": "foo@pdx.EDU", "password": "lame"})
+        self.assertFalse(form.is_valid())
+        self.assertIn("You must sign in with CAS", str(form.errors))
+
+        # if it's not a pdx.edu email address, then logging in should not raise that error
+        form = AuthenticationForm(data={"username": "foo@pdx.eduuu", "password": "lame"})
+        self.assertFalse(form.is_valid())
+        self.assertNotIn("You must sign in with CAS", str(form.errors))
+
+
 class RateLimitingOnLoginTest(TestCase):
     def test_nothing_happens_if_username_is_blank(self):
         with patch("hipaa.forms.clean") as clean:
             logger = Mock()
             with patch("hipaa.forms.get_logger", return_value=logger) as clean:
                 form = Mock(cleaned_data={})
-                rate_limiting_clean(form)
+                authentication_form_clean(form)
                 self.assertTrue(clean.called)
                 self.assertFalse(logger.called)
 
