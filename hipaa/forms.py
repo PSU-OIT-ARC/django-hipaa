@@ -8,7 +8,11 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    PasswordResetForm,
+    SetPasswordForm,
+)
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import ValidationError
 from django.utils.timezone import now
@@ -133,3 +137,19 @@ def ensure_safe_password(self):
             raise ValidationError("The password is too common.")
 
 SetPasswordForm.clean_new_password2 = ensure_safe_password
+
+
+# hook into the PasswordResetForm form, so we can warn when users with @pdx.edu
+# email addresses are trying to reset their passwords
+clean_email = getattr(PasswordResetForm, "clean_email", lambda self: self.cleaned_data['email'])
+
+
+def disallow_pdx_edu_resets(self):
+    email = self.cleaned_data['email']
+    if email.lower().endswith("@pdx.edu"):
+        raise ValidationError("You must login using CAS. Your password cannot be reset this way.")
+
+    return clean_email(self)
+
+
+PasswordResetForm.clean_email = disallow_pdx_edu_resets

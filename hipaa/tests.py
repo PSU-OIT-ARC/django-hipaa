@@ -4,11 +4,13 @@ from unittest.mock import Mock, patch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
+from django.forms import ValidationError
 from django.test import TestCase
 from model_mommy.mommy import make
 
 from .forms import (
     AuthenticationForm,
+    PasswordResetForm,
     SetPasswordForm,
     authentication_form_clean,
 )
@@ -336,3 +338,17 @@ class PasswordChangeTest(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn("The password is too common", str(form.errors['new_password2']))
+
+
+class PasswordResetFormTest(TestCase):
+    def test_disallow_pdx_edu_password_resets(self):
+        form = PasswordResetForm()
+        form.cleaned_data = {'email': "foo@pdx.edu"}
+        with self.assertRaises(ValidationError) as e:
+            form.clean_email()
+
+        self.assertIn('You must login using CAS. Your password cannot be reset this way.', str(e.exception))
+
+        form = PasswordResetForm()
+        form.cleaned_data = {'email': "foo@bar.com"}
+        self.assertEqual("foo@bar.com", form.clean_email())
