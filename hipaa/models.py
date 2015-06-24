@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models.base import ModelBase
-from ipware.ip import get_real_ip
+from ipware.ip import get_ip
 
 
 class LogModelField(models.ForeignKey):
@@ -58,7 +58,7 @@ class Log(models.Model, metaclass=LogMeta):
             user = request.user
 
         if request and ip_address is None:
-            ip_address = get_real_ip(request)
+            ip_address = get_ip(request)
 
         if not action:
             raise ValueError("Action must be a non-empty string")
