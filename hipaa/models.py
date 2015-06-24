@@ -65,8 +65,9 @@ class Log(models.Model, metaclass=LogMeta):
 
         log = cls(level=level, user=user, user_pk=getattr(user, "pk", ""), action=action, extra=extra, ip_address=ip_address)
         for field_name, model in loggable_model_fields.items():
-            setattr(log, field_name, model)
-            setattr(log, field_name + "_pk", model.pk)
+            if model is not None and model.pk is not None:
+                setattr(log, field_name, model)
+                setattr(log, field_name + "_pk", model.pk)
 
         log.save()
         return log
