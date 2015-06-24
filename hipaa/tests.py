@@ -2,6 +2,7 @@ import time
 from unittest.mock import Mock, patch
 
 from django.conf import settings
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.contrib.auth.models import User
 from django.db import models
 from django.forms import ValidationError
@@ -338,6 +339,15 @@ class PasswordChangeTest(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn("The password is too common", str(form.errors['new_password2']))
+
+    def test_password_cannot_be_changed_for_pdx_edu_users(self):
+        user = make(User, first_name="first", last_name="last", email="foo@pdx.edu", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "password1",
+            "new_password2": "password1"
+        })
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="cas-password-change"))
 
 
 class PasswordResetFormTest(TestCase):

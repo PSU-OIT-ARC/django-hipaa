@@ -81,7 +81,7 @@ def authentication_form_clean(self):
             )
 
         if self.cleaned_data["username"].lower().endswith("@pdx.edu"):
-            raise ValidationError("You must sign in with CAS")
+            raise ValidationError("You must sign in with CAS", code="cas-required")
 
     return clean(self)
 
@@ -139,6 +139,21 @@ def ensure_safe_password(self):
 SetPasswordForm.clean_new_password2 = ensure_safe_password
 
 
+# hook into SetPasswordForm clean so we can ensure people with @pdx.edu email
+# accounts can't use this form
+clean_set_password_form = getattr(SetPasswordForm, "clean", lambda self: None)
+
+
+def disallow_pdx_edu_changes(self):
+    email = self.user.email
+    if email.lower().endswith("@pdx.edu"):
+        raise ValidationError("You cannot change your password since you use CAS.", code="cas-password-change")
+
+    return clean_set_password_form(self)
+
+SetPasswordForm.clean = disallow_pdx_edu_changes
+
+
 # hook into the PasswordResetForm form, so we can warn when users with @pdx.edu
 # email addresses are trying to reset their passwords
 clean_email = getattr(PasswordResetForm, "clean_email", lambda self: self.cleaned_data['email'])
@@ -147,7 +162,7 @@ clean_email = getattr(PasswordResetForm, "clean_email", lambda self: self.cleane
 def disallow_pdx_edu_resets(self):
     email = self.cleaned_data['email']
     if email.lower().endswith("@pdx.edu"):
-        raise ValidationError("You must login using CAS. Your password cannot be reset this way.")
+        raise ValidationError("You must login using CAS. Your password cannot be reset this way.", code="cas-password-reset")
 
     return clean_email(self)
 
