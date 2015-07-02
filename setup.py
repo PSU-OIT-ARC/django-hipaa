@@ -6,6 +6,7 @@ setup(
     version='0.0.1',
     install_requires=['django-ipware'],
     packages=find_packages(),
+    include_package_data=True,
     long_description=open('README.md').read(),
     author='Matt Johnson',
     extras_require={
