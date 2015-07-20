@@ -195,7 +195,7 @@ class StillAliveMiddlewareTest(TestCase):
         )
         right_now = 5
         with patch("hipaa.middleware.time.time", return_value=right_now):
-            self.assertEqual("unauthenticated", mw.process_request(request).content.decode())
+            self.assertEqual("unauthenticated", json.loads(mw.process_request(request).content.decode())['state'])
 
     def test_authenticated_user_who_hits_the_site_after_AUTOMATIC_LOGOUT_AFTER_should_be_logged_out(self):
         # a logged in user who hits the site after AUTOMATIC_LOGOUT_AFTER
@@ -215,8 +215,6 @@ class StillAliveMiddlewareTest(TestCase):
                     self.assertTrue(logout.called)
 
     def test_pings_after_AUTOMATIC_LOGOUT_AFTER_seconds_should_not_return_authenticated(self):
-        # if you ping the site after AUTOMATIC_LOGOUT_AFTER then you should be
-        # logged out, and the response back should be something other than "ok"
         mw = StillAliveMiddleware()
         request = Mock(
             META={"HTTP_X_HIPAA_PING": "1"},
@@ -236,8 +234,6 @@ class StillAliveMiddlewareTest(TestCase):
                     self.assertTrue(logout.called)
 
     def test_pings_before_AUTOMATIC_LOGOUT_AFTER_seconds_should_be_authenticated(self):
-        # if you ping the site before AUTOMATIC_LOGOUT_AFTER then the response
-        # should be OK
         mw = StillAliveMiddleware()
         request = Mock(
             META={"HTTP_X_HIPAA_PING": "1"},
@@ -249,7 +245,7 @@ class StillAliveMiddlewareTest(TestCase):
             with patch("hipaa.middleware.logout") as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertEqual("authenticated", mw.process_request(request).content.decode())
+                    self.assertEqual("authenticated", json.loads(mw.process_request(request).content.decode())['state'])
                     self.assertFalse(logout.called)
 
     def test_PING_TIMESTAMP_not_updated_when_ping_header_is_not_one(self):
@@ -264,9 +260,79 @@ class StillAliveMiddlewareTest(TestCase):
             with patch("hipaa.middleware.logout") as logout:
                 with patch("hipaa.middleware.messages"):
                     # should redirect to the login page
-                    self.assertEqual("authenticated", mw.process_request(request).content.decode())
+                    self.assertEqual("authenticated", json.loads(mw.process_request(request).content.decode())['state'])
                     self.assertFalse(logout.called)
         self.assertEqual(0, request.session["HIPAA_LAST_PING"])
+
+    def test_anonymous_users_dont_ping_very_often(self):
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "1"},
+            user=Mock(is_authenticated=lambda: False),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = settings.AUTOMATIC_LOGOUT_AFTER.total_seconds()-1
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(2147483.0, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
+
+    def test_pings_happen_more_frequently_as_the_logout_time_approaches(self):
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "1"},
+            user=Mock(is_authenticated=lambda: True),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = 0
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(2.5, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
+
+        # if we're 1 second in, the ping should happen at 2 seconds, since
+        # we're 4 seconds away from logout
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "0"},
+            user=Mock(is_authenticated=lambda: True),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = 1
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(2, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
+
+        # if we're two seconds in, the ping should happen in 1.5 seconds, since
+        # we're 3 seconds away from logout
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "0"},
+            user=Mock(is_authenticated=lambda: True),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = 2
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(1.5, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
+
+        # if we're three seconds in, the ping should happen in 1 seconds, since
+        # we're 2 seconds away from logout
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "0"},
+            user=Mock(is_authenticated=lambda: True),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = 3
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(1, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
+
+        # if we're four seconds in, the ping should happen in 1 seconds (not at 0.5 since that is too small), since
+        # we're 1 second away from logout
+        mw = StillAliveMiddleware()
+        request = Mock(
+            META={"HTTP_X_HIPAA_PING": "0"},
+            user=Mock(is_authenticated=lambda: True),
+            session={"HIPAA_LAST_PING": 0}
+        )
+        right_now = 4
+        with patch("hipaa.middleware.time.time", return_value=right_now):
+            self.assertEqual(1, json.loads(mw.process_request(request).content.decode())['seconds_until_next_ping'])
 
 
 class PasswordChangeTest(TestCase):

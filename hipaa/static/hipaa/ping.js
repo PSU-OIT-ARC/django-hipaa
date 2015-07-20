@@ -1,11 +1,7 @@
 /*
- * Sends a ping to the site every HIPAA_MILLISECONDS_BETWEEN_PINGS milliseconds
- * (or 5 minutes by default)
+ * Sends a ping to the site every once in a while, so your session doesn't expire
  */
 $(document).ready(function(){
-    // this should be about half of the AUTOMATIC_LOGOUT_AFTER time
-    // 5 minutes is reasonable for most configurations
-    var milliseconds_between_pings = typeof(HIPAA_MILLISECONDS_BETWEEN_PINGS) === "undefined" ? 1000*60*5 : HIPAA_MILLISECONDS_BETWEEN_PINGS;
     // the date we last detected any activity on the page
     var last_activity = new Date();
     // the last thing a ping went out
@@ -15,12 +11,21 @@ $(document).ready(function(){
     // they got logged out)
     var state = "unauthenticated";
 
+    // The message to display when a logout is coming soon. thanks http://howtocenterincss.com/
+    var message = '\
+        <div style="display:table;width:100%;height:100%">\
+          <div style="display:table-cell;vertical-align:middle;">\
+            <div style="text-align:center; font-size:24px; background-color:#ffff00; cursor:pointer; padding:20px">Your session will expire soon. Click on this box to extend it!</div>\
+          </div>\
+        </div>\
+    '
+
     // detect any activity on the page
     $('body').on("mousemove click keyup scroll", function(){
         last_activity = new Date();
     });
 
-    setInterval(function(){
+    var ping = function(){
         // was there any activity?
         var was_activity = +(last_activity > last_ping)
 
@@ -31,16 +36,39 @@ $(document).ready(function(){
             // will intercept any request
             'url': window.location,
             'headers': {'X-HIPAA-PING': was_activity},
-            'success': function(new_state){
+            'success': function(response){
                 // if there was a transition from being authenticated to being
                 // unauthenticated, then reload the page (which will trigger a
                 // redirect to the login via some Django middleware)
-                if(state == "authenticated" && new_state != "authenticated"){
+                if(state == "authenticated" && response.state != "authenticated"){
                     location.reload(true);
                 }
-                state = new_state
+                state = response.state
+                if(response.seconds_until_next_ping <= 30 && $('#hipaa-ping-warning').length == 0){
+                    var div = $("<div>")
+                    div.attr("id", "hipaa-ping-warning")
+                    div.css({
+                        "position": "absolute",
+                        "left": "0",
+                        "top": "0",
+                        "right": "0",
+                        "bottom": "0",
+                        "zindex": "100000",
+                        "background": "rgba(255, 255, 255, .5)",
+                    })
+                    div.html(message)
+                    div.click(function(){
+                        $(this).remove();
+                        // a click will trigger our body click handler which
+                        // will update last_activity
+                    })
+                    $('body').append(div)
+                }
+                setTimeout(ping, response.seconds_until_next_ping*1000)
             },
         });
         last_ping = new Date();
-    }, milliseconds_between_pings);
+    }
+
+    ping()
 });
