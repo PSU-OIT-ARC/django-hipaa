@@ -37,10 +37,7 @@ def get_logger():
 
 # Monkey patches the AuthenticationForm.clean method so it takes into account the
 # LOGIN_RATE_LIMIT
-clean = AuthenticationForm.clean
-
-
-def authentication_form_clean(self):
+def authentication_form_clean(self, clean=AuthenticationForm.clean):
     """
     This adds rate limiting to the login form and forbids logging in with an @pdx.edu email
     """
@@ -90,10 +87,7 @@ AuthenticationForm.clean = authentication_form_clean
 
 # hook into the SetPasswordForm (which is used to reset a password), so we can
 # log it happened
-save = SetPasswordForm.save
-
-
-def log_password_change(self):
+def log_password_change(self, save=SetPasswordForm.save):
     """
     This adds logging to the SetPasswordForm which is used when a password is
     being reset
@@ -107,14 +101,13 @@ SetPasswordForm.save = log_password_change
 
 # hook into SetPasswordForm again so we can ensure the password meets certain
 # requirements
-clean_new_password2 = SetPasswordForm.clean_new_password2
 
 password_list_path = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'common-passwords.txt.gz'
 )
 
 
-def ensure_safe_password(self):
+def ensure_safe_password(self, clean_new_password2=SetPasswordForm.clean_new_password2):
     password2 = clean_new_password2(self)
     if password2:
         if len(password2) < 8:
@@ -141,30 +134,23 @@ SetPasswordForm.clean_new_password2 = ensure_safe_password
 
 # hook into SetPasswordForm clean so we can ensure people with @pdx.edu email
 # accounts can't use this form
-clean_set_password_form = getattr(SetPasswordForm, "clean", lambda self: None)
-
-
-def disallow_pdx_edu_changes(self):
+def disallow_pdx_edu_changes(self, clean=getattr(SetPasswordForm, "clean", lambda self: None)):
     email = self.user.email
     if email.lower().endswith("@pdx.edu"):
         raise ValidationError("You cannot change your password since you use CAS.", code="cas-password-change")
 
-    return clean_set_password_form(self)
+    return clean(self)
 
 SetPasswordForm.clean = disallow_pdx_edu_changes
 
 
 # hook into the PasswordResetForm form, so we can warn when users with @pdx.edu
 # email addresses are trying to reset their passwords
-clean_email = getattr(PasswordResetForm, "clean_email", lambda self: self.cleaned_data['email'])
-
-
-def disallow_pdx_edu_resets(self):
+def disallow_pdx_edu_resets(self, clean_email=getattr(PasswordResetForm, "clean_email", lambda self: self.cleaned_data['email'])):
     email = self.cleaned_data['email']
     if email.lower().endswith("@pdx.edu"):
         raise ValidationError("You must login using CAS. Your password cannot be reset this way.", code="cas-password-reset")
 
     return clean_email(self)
-
 
 PasswordResetForm.clean_email = disallow_pdx_edu_resets

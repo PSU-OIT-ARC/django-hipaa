@@ -71,7 +71,7 @@ class PDXEmailAddressesRequireCASLogin(TestCase):
 
 class RateLimitingOnLoginTest(TestCase):
     def test_nothing_happens_if_username_is_blank(self):
-        with patch("hipaa.forms.clean") as clean:
+        with patch("hipaa.forms.AuthenticationForm.clean") as clean:
             logger = Mock()
             with patch("hipaa.forms.get_logger", return_value=logger) as clean:
                 form = Mock(cleaned_data={})
