@@ -1,13 +1,17 @@
 import json
 import time
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.auth.views import password_change
 from django.core.exceptions import NON_FIELD_ERRORS
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.forms import ValidationError
 from django.test import TestCase
+from django.utils.timezone import now
 from model_mommy.mommy import make
 
 from .forms import (
@@ -15,8 +19,13 @@ from .forms import (
     PasswordResetForm,
     SetPasswordForm,
     authentication_form_clean,
+    get_logger,
 )
-from .middleware import StillAliveMiddleware
+from .middleware import (
+    REQUIRE_PASSWORD_RESET_AFTER,
+    RequirePasswordChangeMiddleware,
+    StillAliveMiddleware,
+)
 from .models import Log, LogModelField
 
 
@@ -416,6 +425,30 @@ class PasswordChangeTest(TestCase):
         self.assertFalse(form.is_valid())
         self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="cas-password-change"))
 
+    def test_cant_use_a_previous_password(self):
+        user = make(User, first_name="first", last_name="last", email="foo@example.com", username="username")
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "alphaBETA1!",
+            "new_password2": "alphaBETA1!",
+        })
+        self.assertTrue(form.is_valid())
+        form.save()
+
+        # this should fail, since it's exactly the same password
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "alphaBETA1!",
+            "new_password2": "alphaBETA1!",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error("new_password2", code="password-reuse"))
+
+        # this should not fail, since it is a different password
+        form = SetPasswordForm(user=user, data={
+            "new_password1": "alphaBETA1!!",
+            "new_password2": "alphaBETA1!!",
+        })
+        self.assertTrue(form.is_valid())
+
 
 class PasswordResetFormTest(TestCase):
     def test_disallow_pdx_edu_password_resets(self):
@@ -429,3 +462,52 @@ class PasswordResetFormTest(TestCase):
         form = PasswordResetForm()
         form.cleaned_data = {'email': "foo@bar.com"}
         self.assertEqual("foo@bar.com", form.clean_email())
+
+
+class RequirePasswordChangeMiddlewareTest(TestCase):
+    def test_noop_for_anonymous_users(self):
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=Mock(is_authenticated=lambda *args, **kwargs: False), path="/")
+        self.assertEqual(None, mw.process_request(request))
+
+    def test_noop_for_pdx_users(self):
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=Mock(is_authenticated=lambda *args, **kwargs: True, email="foo@pdx.edu"), path="/")
+        self.assertEqual(None, mw.process_request(request))
+
+    def test_redirect_to_password_reset(self):
+        # if the user has never set their password, it should redirect
+        user = make(User, email="foo@example.com")
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=user, path="/", client=self.client)
+        response = mw.process_request(request)
+        self.assertNotEqual(None, response)
+        self.assertEqual(response.url, reverse(password_change))
+
+        # if the user has changed their password in the last
+        # REQUIRE_PASSWORD_RESET_AFTER units of time, then no redirect
+        Logger = get_logger()
+        Logger.info(user=user, action=Logger.PASSWORD_RESET)
+        Logger.objects.update(created_on=now()-REQUIRE_PASSWORD_RESET_AFTER+timedelta(minutes=1))
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=user, path="/", client=self.client)
+        response = mw.process_request(request)
+        self.assertEqual(None, response)
+
+        # if we haven't reset in the last REQUIRE_PASSWORD_RESET_AFTER units of
+        # time, then redirect
+        Logger.objects.all().delete()
+        Logger.info(user=user, action=Logger.PASSWORD_RESET)
+        Logger.objects.update(created_on=now()-REQUIRE_PASSWORD_RESET_AFTER-timedelta(minutes=1))
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=user, path="/", client=self.client)
+        response = mw.process_request(request)
+        self.assertNotEqual(None, response)
+        self.assertEqual(response.url, reverse(password_change))
+
+    def test_logout_always_works(self):
+        user = make(User, email="foo@example.com")
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=user, path="/logout/", client=self.client)
+        response = mw.process_request(request)
+        self.assertEqual(None, response)

@@ -33,6 +33,7 @@ settings.configure(
     AUTOMATIC_LOGOUT_AFTER=timedelta(seconds=5),
     LOGIN_RATE_LIMIT=(2, timedelta(seconds=.25)),
     LOGIN_URL="/login",
+    ROOT_URLCONF="urls",
 )
 
 if django.VERSION[:2] >= (1, 7):

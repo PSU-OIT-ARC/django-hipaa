@@ -4,8 +4,14 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import logout
+from django.contrib.auth.views import logout, password_change
+from django.core.urlresolvers import reverse
 from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.utils.timezone import now
+
+from .forms import get_logger
+from .models import Log
 
 PING_TIMESTAMP_SESSION_NAME = "HIPAA_LAST_PING"
 # the header name for the ping request is X-HIPAA-PING but Django transforms
@@ -13,6 +19,8 @@ PING_TIMESTAMP_SESSION_NAME = "HIPAA_LAST_PING"
 HIPAA_PING_HEADER_NAME = "HTTP_" + "X-HIPAA-PING".replace("-", "_")
 # the amount of time before an automatic logout should happen
 AUTOMATIC_LOGOUT_AFTER = getattr(settings, "AUTOMATIC_LOGOUT_AFTER", timedelta(minutes=15))
+
+REQUIRE_PASSWORD_RESET_AFTER = getattr(settings, "REQUIRE_PASSWORD_RESET_AFTER", timedelta(days=180))
 
 
 class StillAliveMiddleware:
@@ -67,3 +75,21 @@ class StillAliveMiddleware:
         else:
             # nothing to do
             return None
+
+
+class RequirePasswordChangeMiddleware:
+    """
+    This requires users with non-@pdx.edu email accounts to reset their
+    password every so often
+    """
+    def process_request(self, request):
+        Logger = get_logger()
+        if (request.user.is_authenticated() and
+                not request.user.email.lower().endswith("@pdx.edu") and
+                request.path != reverse(logout) and
+                request.path != reverse(password_change)):
+            # check to see if their password has changed in the last n days
+            if not Logger.objects.filter(user=request.user, action=Log.PASSWORD_RESET, created_on__gt=(now()-REQUIRE_PASSWORD_RESET_AFTER)).exists():
+                return redirect(password_change)
+
+        return None

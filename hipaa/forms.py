@@ -13,6 +13,7 @@ from django.contrib.auth.forms import (
     PasswordResetForm,
     SetPasswordForm,
 )
+from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import ValidationError
 from django.utils.timezone import now
@@ -21,6 +22,8 @@ from .models import Log
 
 # allow a user to try to login n times per unit of time
 LOGIN_RATE_LIMIT = getattr(settings, "LOGIN_RATE_LIMIT", (20, timedelta(minutes=10)))
+
+CANNOT_USE_LAST_N_PASSWORDS = getattr(settings, "CANNOT_USE_LAST_N_PASSWORDS", 24)
 
 
 def get_logger():
@@ -93,8 +96,11 @@ def log_password_change(self, save=SetPasswordForm.save):
     being reset
     """
     Logger = get_logger()
-    Logger.info(action=Logger.PASSWORD_RESET, user=self.user)
     save(self)
+    # we log this as a PasswordReset (even though it could also just be a password change).
+    # We keep track of the hashed password, so when they try to change their
+    # password again, we can make sure they are not reusing an old password
+    Logger.info(action=Logger.PASSWORD_RESET, user=self.user, extra=self.user.password)
 
 SetPasswordForm.save = log_password_change
 
@@ -128,6 +134,17 @@ def ensure_safe_password(self, clean_new_password2=SetPasswordForm.clean_new_pas
         common_passwords_lines = gzip.open(password_list_path).read().decode('utf-8').splitlines()
         if password2 in common_passwords_lines:
             raise ValidationError("The password is too common.")
+
+        # make sure they haven't used this password before
+        Logger = get_logger()
+        previous_password_hashes = Logger.objects.filter(
+            user=self.user,
+            action=Log.PASSWORD_RESET
+        ).order_by("-pk").exclude(extra="").values_list("extra", flat=True)[:CANNOT_USE_LAST_N_PASSWORDS]
+        for previous_hash in previous_password_hashes:
+            if check_password(password2, previous_hash):
+                raise ValidationError("The password has been used by you before", code="password-reuse")
+
 
 SetPasswordForm.clean_new_password2 = ensure_safe_password
 

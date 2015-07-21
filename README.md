@@ -8,6 +8,10 @@ This is a collection of monkey patches and utilties to make a site more HIPAA fr
 - Provides an abstract base model for simple Logging capabilities (which many of this package's features rely on)
 - Automatically logs out a user after a configurable amount of inactivity. A simple JavaScript pinging mechanism is used to prevent logouts when the user is actively engaged on a single page for a long time.
 - Ensures passwords are complex
+- Ensure users with @pdx.edu email addresses can't change their passwords (since they login via CAS)
+- Ensure users with @pdx.edu email address can't login via the normal AuthenticationForm
+- Ensure users can't re-use the last N passwords they've used
+- Ensure passwords are changed every M units of time
 - Python 3+ only
 
 # Assumptions
@@ -21,7 +25,7 @@ This is a collection of monkey patches and utilties to make a site more HIPAA fr
 
     pip install -e this package
 
-After `SessionMiddleware`, `AuthenticationMiddleware` and `MessageMiddleware`, append **`hipaa.middleware.StillAliveMiddleware` to `MIDDLEWARE_CLASSES`**
+After `SessionMiddleware`, `AuthenticationMiddleware` and `MessageMiddleware`, append **`hipaa.middleware.RequirePasswordChangeMiddleware`** and **`hipaa.middleware.StillAliveMiddleware` to `MIDDLEWARE_CLASSES`**
 
 Add 'hipaa' to INSTALLED_APPS.
 
@@ -44,9 +48,18 @@ Add some settings to your project:
     # project/settings.py
     from datetime import timedelta
 
+    # Automatically log the user out when you haven't seen a new HTTP request,
+    # or any activity in this many units of time
     AUTOMATIC_LOGOUT_AFTER = timedelta(minutes=15)
+
     # 20 login attempts per 10 minutes
     LOGIN_RATE_LIMIT = (20, timedelta(minutes=10))
+
+    # Require the password to be reset after this amount of time
+    REQUIRE_PASSWORD_RESET_AFTER = timedelta(days=180)
+
+    # Prevent the re-use of the last n passwords
+    CANNOT_USE_LAST_N_PASSWORDS = 24
 
 
 # Usage
@@ -90,6 +103,4 @@ In the example above, if the Car object was deleted, the `car` field on the Log 
 
 ## Timeout
 
-Add `<script src="{{ STATIC_URL }}hipaa/ping.js"></script>` to your base Django template (after jQuery is included) to ping the site every 5 minutes (by default). This will prevent the user from being logged out if they stay on the same page for a long time.
-
-If you set HIPAA_MILLISECONDS_BETWEEN_PINGS in JavaScript land before the script is included, then it will use that instead of the 5 minute default.
+Add `<script src="{{ STATIC_URL }}hipaa/ping.js"></script>` to your base Django template (after jQuery is included) to ping the site every once in a while. This will prevent the user from being logged out if they stay on the same page for a long time.
