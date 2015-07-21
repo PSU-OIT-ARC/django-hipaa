@@ -10,6 +10,8 @@ $(document).ready(function(){
     // reload the page, since that will redirect them to the login page (since
     // they got logged out)
     var state = "unauthenticated";
+    var DEFAULT_RETRY_DELAY = 8000;
+    var retry_delay = DEFAULT_RETRY_DELAY;
 
     // The message to display when a logout is coming soon. thanks http://howtocenterincss.com/
     var message = '\
@@ -36,7 +38,14 @@ $(document).ready(function(){
             // will intercept any request
             'url': window.location,
             'headers': {'X-HIPAA-PING': was_activity},
+            'error': function(){
+                // use exponential back-off when the request fails, up to a minute
+                setTimeout(ping, retry_delay)
+                retry_delay = Math.min(retry_delay*2, 60*1000)
+            },
             'success': function(response){
+                // reset the retry_delay since we're back to normal
+                retry_delay = DEFAULT_RETRY_DELAY;
                 // if there was a transition from being authenticated to being
                 // unauthenticated, then reload the page (which will trigger a
                 // redirect to the login via some Django middleware)
