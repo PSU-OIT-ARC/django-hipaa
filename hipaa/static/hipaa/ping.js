@@ -38,44 +38,42 @@ $(document).ready(function(){
             // will intercept any request
             'url': window.location,
             'headers': {'X-HIPAA-PING': was_activity},
-            'error': function(){
-                // use exponential back-off when the request fails, up to a minute
-                setTimeout(ping, retry_delay)
-                retry_delay = Math.min(retry_delay*2, 60*1000)
-            },
-            'success': function(response){
-                // reset the retry_delay since we're back to normal
-                retry_delay = DEFAULT_RETRY_DELAY;
-                // if there was a transition from being authenticated to being
-                // unauthenticated, then reload the page (which will trigger a
-                // redirect to the login via some Django middleware)
-                if(state == "authenticated" && response.state != "authenticated"){
-                    location.reload(true);
-                }
-                state = response.state
-                if(response.seconds_until_next_ping <= 30 && $('#hipaa-ping-warning').length == 0){
-                    var div = $("<div>")
-                    div.attr("id", "hipaa-ping-warning")
-                    div.css({
-                        "position": "absolute",
-                        "left": "0",
-                        "top": "0",
-                        "right": "0",
-                        "bottom": "0",
-                        "zindex": "100000",
-                        "background": "rgba(255, 255, 255, .5)",
-                    })
-                    div.html(message)
-                    div.click(function(){
-                        $(this).remove();
-                        // a click will trigger our body click handler which
-                        // will update last_activity
-                    })
-                    $('body').append(div)
-                }
-                setTimeout(ping, response.seconds_until_next_ping*1000)
-            },
-        });
+        }).fail(function(){
+            // use exponential back-off when the request fails, up to a minute
+            setTimeout(ping, retry_delay)
+            retry_delay = Math.min(retry_delay*2, 60*1000)
+        }).done(function(response){
+            // reset the retry_delay since we're back to normal
+            retry_delay = DEFAULT_RETRY_DELAY;
+            // if there was a transition from being authenticated to being
+            // unauthenticated, then reload the page (which will trigger a
+            // redirect to the login via some Django middleware)
+            if(state == "authenticated" && response.state != "authenticated"){
+                location.reload(true);
+            }
+            state = response.state
+            if(response.seconds_until_next_ping <= 30 && $('#hipaa-ping-warning').length == 0){
+                var div = $("<div>")
+                div.attr("id", "hipaa-ping-warning")
+                div.css({
+                    "position": "absolute",
+                    "left": "0",
+                    "top": "0",
+                    "right": "0",
+                    "bottom": "0",
+                    "zindex": "100000",
+                    "background": "rgba(255, 255, 255, .5)",
+                })
+                div.html(message)
+                div.click(function(){
+                    $(this).remove();
+                    // a click will trigger our body click handler which
+                    // will update last_activity
+                })
+                $('body').append(div)
+            }
+            setTimeout(ping, response.seconds_until_next_ping*1000)
+        }),
         last_ping = new Date();
     }
 
