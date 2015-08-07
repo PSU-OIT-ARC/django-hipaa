@@ -83,6 +83,11 @@ class RequirePasswordChangeMiddleware:
     password every so often
     """
     def process_request(self, request):
+        # if the user is cloaked (thanks to the django-cloak middleware),
+        # bypass the password change stuff
+        if getattr(request.user, 'is_cloaked', False):
+            return None
+
         Logger = get_logger()
         if (request.user.is_authenticated() and
                 not request.user.email.lower().endswith("@pdx.edu") and
