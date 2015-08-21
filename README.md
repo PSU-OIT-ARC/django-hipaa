@@ -62,6 +62,8 @@ Add some settings to your project:
     CANNOT_USE_LAST_N_PASSWORDS = 24
 
 
+Add `<script src="{{ STATIC_URL }}hipaa/ping.js"></script>` to your base Django template (after jQuery is included) to ping the site every once in a while. This will prevent the user from being logged out if they stay on the same page for a long time.
+
 # Usage
 
 ## Logging
@@ -100,7 +102,3 @@ def some_django_view(request, car_id)
 ### Deletions
 
 In the example above, if the Car object was deleted, the `car` field on the Log entry would be set to null. This is problematic because you lose important information about the log entry (i.e. what car it was in reference to). To get around this problem, a special field called `fieldname_pk` on the Log model (where `fieldname` is the name of the field) is automatically created when you declare a `LogModelField`. It contains the string PK of the model the log entry is for. In this example, there is a field on the Log model called "car_pk" which contains the PK of the car object it referenced.
-
-## Timeout
-
-Add `<script src="{{ STATIC_URL }}hipaa/ping.js"></script>` to your base Django template (after jQuery is included) to ping the site every once in a while. This will prevent the user from being logged out if they stay on the same page for a long time.
