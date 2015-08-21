@@ -8,16 +8,15 @@ This is a collection of monkey patches and utilties to make a site more HIPAA fr
 - Provides an abstract base model for simple Logging capabilities (which many of this package's features rely on)
 - Automatically logs out a user after a configurable amount of inactivity. A simple JavaScript pinging mechanism is used to prevent logouts when the user is actively engaged on a single page for a long time.
 - Ensures passwords are complex
-- Ensure users with @pdx.edu email addresses can't change their passwords (since they login via CAS)
-- Ensure users with @pdx.edu email address can't login via the normal AuthenticationForm
 - Ensure users can't re-use the last N passwords they've used
-- Ensure passwords are changed every M units of time
+- Ensure passwords are changed every M units of time (where M can differ for is_staff=True and is_staff=False users)
 - Python 3+ only
 
 # Assumptions
 
 - You're using the SessionMiddleware, AuthenticationMiddleware, MessageMiddleware.
 - You use the `AuthenticationForm` and `SetPasswordForm` from `django.contrib.auth.forms` to authenticate users and reset passwords.
+- You're using the normal `logout` and `password_change` views from `django.contrib.auth.views`
 - You can stomach the idea of monkey patching to minimize changes to the consumer of this package.
 - You're running jQuery on the client side
 
@@ -57,6 +56,7 @@ Add some settings to your project:
 
     # Require the password to be reset after this amount of time
     REQUIRE_PASSWORD_RESET_AFTER = timedelta(days=180)
+    REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER = timedelta(days=90)
 
     # Prevent the re-use of the last n passwords
     CANNOT_USE_LAST_N_PASSWORDS = 24

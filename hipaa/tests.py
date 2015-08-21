@@ -23,6 +23,7 @@ from .forms import (
 )
 from .middleware import (
     REQUIRE_PASSWORD_RESET_AFTER,
+    REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER,
     RequirePasswordChangeMiddleware,
     StillAliveMiddleware,
 )
@@ -416,15 +417,6 @@ class PasswordChangeTest(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("The password is too common", str(form.errors['new_password2']))
 
-    def test_password_cannot_be_changed_for_pdx_edu_users(self):
-        user = make(User, first_name="first", last_name="last", email="foo@pdx.edu", username="username")
-        form = SetPasswordForm(user=user, data={
-            "new_password1": "password1",
-            "new_password2": "password1"
-        })
-        self.assertFalse(form.is_valid())
-        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="cas-password-change"))
-
     def test_cant_use_a_previous_password(self):
         user = make(User, first_name="first", last_name="last", email="foo@example.com", username="username")
         form = SetPasswordForm(user=user, data={
@@ -449,19 +441,6 @@ class PasswordChangeTest(TestCase):
         })
         self.assertTrue(form.is_valid())
 
-
-class PasswordResetFormTest(TestCase):
-    def test_disallow_pdx_edu_password_resets(self):
-        form = PasswordResetForm()
-        form.cleaned_data = {'email': "foo@pdx.edu"}
-        with self.assertRaises(ValidationError) as e:
-            form.clean_email()
-
-        self.assertIn('You must login using CAS. Your password cannot be reset this way.', str(e.exception))
-
-        form = PasswordResetForm()
-        form.cleaned_data = {'email': "foo@bar.com"}
-        self.assertEqual("foo@bar.com", form.clean_email())
 
 
 class RequirePasswordChangeMiddlewareTest(TestCase):
@@ -499,6 +478,21 @@ class RequirePasswordChangeMiddlewareTest(TestCase):
         Logger.objects.all().delete()
         Logger.info(user=user, action=Logger.PASSWORD_RESET)
         Logger.objects.update(created_on=now()-REQUIRE_PASSWORD_RESET_AFTER-timedelta(minutes=1))
+        mw = RequirePasswordChangeMiddleware()
+        request = Mock(user=user, path="/", client=self.client)
+        response = mw.process_request(request)
+        self.assertNotEqual(None, response)
+        self.assertEqual(response.url, reverse(password_change))
+
+        # staff members are a special case, and have to reset their passwords
+        # after REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER units of time
+        user.is_staff = True
+        user.save()
+        # if we haven't reset in the last REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER units of
+        # time, then redirect
+        Logger.objects.all().delete()
+        Logger.info(user=user, action=Logger.PASSWORD_RESET)
+        Logger.objects.update(created_on=now()-REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER-timedelta(minutes=1))
         mw = RequirePasswordChangeMiddleware()
         request = Mock(user=user, path="/", client=self.client)
         response = mw.process_request(request)

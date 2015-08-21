@@ -20,7 +20,10 @@ HIPAA_PING_HEADER_NAME = "HTTP_" + "X-HIPAA-PING".replace("-", "_")
 # the amount of time before an automatic logout should happen
 AUTOMATIC_LOGOUT_AFTER = getattr(settings, "AUTOMATIC_LOGOUT_AFTER", timedelta(minutes=15))
 
+# Unfortunately, for the two different user levels (is_staff=True and
+# is_staff=False) we have to have different password expiration policies
 REQUIRE_PASSWORD_RESET_AFTER = getattr(settings, "REQUIRE_PASSWORD_RESET_AFTER", timedelta(days=180))
+REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER = getattr(settings, "REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER", timedelta(days=90))
 
 
 class StillAliveMiddleware:
@@ -79,8 +82,7 @@ class StillAliveMiddleware:
 
 class RequirePasswordChangeMiddleware:
     """
-    This requires users with non-@pdx.edu email accounts to reset their
-    password every so often
+    This requires users to reset their password every so often
     """
     def process_request(self, request):
         # if the user is cloaked (thanks to the django-cloak middleware),
@@ -89,12 +91,15 @@ class RequirePasswordChangeMiddleware:
             return None
 
         Logger = get_logger()
-        if (request.user.is_authenticated() and
-                not request.user.email.lower().endswith("@pdx.edu") and
-                request.path != reverse(logout) and
-                request.path != reverse(password_change)):
-            # check to see if their password has changed in the last n days
-            if not Logger.objects.filter(user=request.user, action=Log.PASSWORD_RESET, created_on__gt=(now()-REQUIRE_PASSWORD_RESET_AFTER)).exists():
+        # to prevent an infinite redirect, if they are logging out or on the
+        # password_change page, don't do anything (and of course, if they
+        # aren't authenticated, there is nothing to do)
+        if (request.user.is_authenticated() and request.path != reverse(logout) and request.path != reverse(password_change)):
+            # check to see if their password has changed in the last n days.
+            # Staff members (is_staff=True) have to reset their passwords more
+            # frequently (by default) than non staff users
+            duration = REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER if request.user.is_staff else REQUIRE_PASSWORD_RESET_AFTER
+            if not Logger.objects.filter(user=request.user, action=Log.PASSWORD_RESET, created_on__gt=(now()-duration)).exists():
                 return redirect(password_change)
 
         return None
