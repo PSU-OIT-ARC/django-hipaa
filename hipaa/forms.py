@@ -8,11 +8,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import (
-    AuthenticationForm,
-    PasswordResetForm,
-    SetPasswordForm,
-)
+from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm
 from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import ValidationError

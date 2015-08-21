@@ -6,17 +6,14 @@ from unittest.mock import Mock, patch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.views import password_change
-from django.core.exceptions import NON_FIELD_ERRORS
 from django.core.urlresolvers import reverse
 from django.db import models
-from django.forms import ValidationError
 from django.test import TestCase
 from django.utils.timezone import now
 from model_mommy.mommy import make
 
 from .forms import (
     AuthenticationForm,
-    PasswordResetForm,
     SetPasswordForm,
     authentication_form_clean,
     get_logger,
@@ -440,7 +437,6 @@ class PasswordChangeTest(TestCase):
             "new_password2": "alphaBETA1!!",
         })
         self.assertTrue(form.is_valid())
-
 
 
 class RequirePasswordChangeMiddlewareTest(TestCase):
