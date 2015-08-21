@@ -65,18 +65,6 @@ class LogModelFieldTest(TestCase):
         self.assertIn("something_pk", dir(logger))
 
 
-class PDXEmailAddressesRequireCASLogin(TestCase):
-    def test_cas_login_required_for_pdx_emails(self):
-        form = AuthenticationForm(data={"username": "foo@pdx.EDU", "password": "lame"})
-        self.assertFalse(form.is_valid())
-        self.assertIn("You must sign in with CAS", str(form.errors))
-
-        # if it's not a pdx.edu email address, then logging in should not raise that error
-        form = AuthenticationForm(data={"username": "foo@pdx.eduuu", "password": "lame"})
-        self.assertFalse(form.is_valid())
-        self.assertNotIn("You must sign in with CAS", str(form.errors))
-
-
 class RateLimitingOnLoginTest(TestCase):
     def test_nothing_happens_if_username_is_blank(self):
         with patch("hipaa.forms.AuthenticationForm.clean") as clean:

@@ -38,7 +38,7 @@ def get_logger():
 # LOGIN_RATE_LIMIT
 def authentication_form_clean(self, clean=AuthenticationForm.clean):
     """
-    This adds rate limiting to the login form and forbids logging in with an @pdx.edu email
+    This adds rate limiting to the login form
     """
     Logger = get_logger()
     # if there was no username, no need to consider a ratelimit
@@ -75,9 +75,6 @@ def authentication_form_clean(self, clean=AuthenticationForm.clean):
                 "Too many login attempts. You can reset your password to login again or wait %d seconds"
                 % LOGIN_RATE_LIMIT[1].total_seconds()
             )
-
-        if self.cleaned_data["username"].lower().endswith("@pdx.edu"):
-            raise ValidationError("You must sign in with CAS", code="cas-required")
 
     return clean(self)
 
