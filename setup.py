@@ -14,6 +14,8 @@ setup(
             "mock",
             "model_mommy",
             "coverage",
+            "flake8",
+            "isort",
             "django" + ("<1.7" if sys.version_info[:2] < (2, 7) else "")
         ],
     }
