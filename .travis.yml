@@ -1,0 +1,5 @@
+language: python
+python:
+  - "3.3"
+sudo: false
+script: make test

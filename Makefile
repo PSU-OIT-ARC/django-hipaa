@@ -1,18 +1,12 @@
 PATH := $(CURDIR)/.env/bin:$(PATH)
-# run the tests for python3
+
 test: .env
-	python runtests.py
+	python runtests.py && flake8 && isort -rc --diff --check-only hipaa
 
-pretty: .env
-	flake8
-	isort --diff -rc hipaa
-
-# remove junk
 clean:
 	rm -rf .env
 	find -iname "*.pyc" -or -iname "__pycache__" -delete
 
-# setup a virtualenv for python3 and install pip
 .env:
 	python3 -m venv .env
 	curl https://raw.githubusercontent.com/pypa/pip/master/contrib/get-pip.py | python
