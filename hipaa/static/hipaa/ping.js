@@ -38,6 +38,7 @@ $(document).ready(function(){
             // will intercept any request
             'url': window.location,
             'headers': {'X-HIPAA-PING': was_activity},
+            'cache': false  // see http://stackoverflow.com/a/25230377/2733517
         }).fail(function(){
             // use exponential back-off when the request fails, up to a minute
             setTimeout(ping, retry_delay)
