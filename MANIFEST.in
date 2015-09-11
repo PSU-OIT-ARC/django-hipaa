@@ -1,2 +1,3 @@
-recursive-include hipaa *
-global-exclude *.pyc __pycache__
+include README.md
+recursive-include hipaa/static *
+recursive-include hipaa/templates *
