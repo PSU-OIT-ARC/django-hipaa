@@ -1,5 +1,10 @@
 import sys
+
 from setuptools import find_packages, setup
+
+
+DJANGO_VERSION_SPEC = '<1.7' if sys.version_info[:2] < (2, 7) else ''
+
 
 setup(
     name='hipaa',
@@ -8,15 +13,16 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     long_description=open('README.md').read(),
-    author='Matt Johnson',
+    author='PSU - OIT - ARC',
+    author_email='consultants@pdx.edu',
     extras_require={
         'dev': [
-            "mock",
-            "model_mommy",
-            "coverage",
-            "flake8",
-            "isort",
-            "django" + ("<1.7" if sys.version_info[:2] < (2, 7) else "")
+            'mock',
+            'model_mommy',
+            'coverage',
+            'flake8',
+            'isort',
+            'django{version_spec}'.format(version_spec=DJANGO_VERSION_SPEC),
         ],
     }
 )
