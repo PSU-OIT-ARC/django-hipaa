@@ -44,6 +44,8 @@ $(document).ready(function(){
             setTimeout(ping, retry_delay)
             retry_delay = Math.min(retry_delay*2, 60*1000)
         }).done(function(response){
+            var werePlaying;
+
             // reset the retry_delay since we're back to normal
             retry_delay = DEFAULT_RETRY_DELAY;
             // if there was a transition from being authenticated to being
@@ -55,6 +57,16 @@ $(document).ready(function(){
             state = response.state
             if(response.seconds_until_next_ping <= response.show_logout_warning_before && $('#hipaa-ping-warning').length == 0){
                 var div = $("<div>")
+
+                werePlaying = [];
+
+                $('video, audio').each(function () {
+                    if (!this.paused) {
+                        this.pause();
+                        werePlaying.push(this);
+                    }
+                });
+
                 div.attr("id", "hipaa-ping-warning")
                 div.css({
                     "position": "absolute",
@@ -70,6 +82,9 @@ $(document).ready(function(){
                     $(this).remove();
                     // a click will trigger our body click handler which
                     // will update last_activity
+                    for (var i = 0; i < werePlaying.length; ++i) {
+                        werePlaying[i].play();
+                    }
                 })
                 $('body').append(div)
             }
