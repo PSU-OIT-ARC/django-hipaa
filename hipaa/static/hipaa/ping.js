@@ -17,7 +17,7 @@ $(document).ready(function(){
     var message = '\
         <div style="display:table;width:100%;height:100%">\
           <div style="display:table-cell;vertical-align:middle;">\
-            <div style="text-align:center; font-size:24px; background-color:#ffff00; cursor:pointer; padding:20px">Your session will expire soon. Click on this box to extend it!</div>\
+            <div style="text-align:center; font-size:24px; background-color:#ffff00; cursor:pointer; padding:20px">Are you still around? You are about to be logged out. Click anywhere in this box to stay logged in.</div>\
           </div>\
         </div>\
     '
