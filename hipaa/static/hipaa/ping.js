@@ -53,7 +53,7 @@ $(document).ready(function(){
                 location.reload(true);
             }
             state = response.state
-            if(response.seconds_until_next_ping <= 30 && $('#hipaa-ping-warning').length == 0){
+            if(response.seconds_until_next_ping <= response.show_logout_warning_before && $('#hipaa-ping-warning').length == 0){
                 var div = $("<div>")
                 div.attr("id", "hipaa-ping-warning")
                 div.css({

@@ -50,6 +50,10 @@ Add some settings to your project:
     # Automatically log the user out when you haven't seen a new HTTP request,
     # or any activity in this many units of time
     AUTOMATIC_LOGOUT_AFTER = timedelta(minutes=15)
+    
+    # Show a pending-logout warning this amount of time before the
+    # pending logout.
+    SHOW_LOGOUT_WARNING_BEFORE = timedelta(minutes=5)
 
     # 20 login attempts per 10 minutes
     LOGIN_RATE_LIMIT = (20, timedelta(minutes=10))

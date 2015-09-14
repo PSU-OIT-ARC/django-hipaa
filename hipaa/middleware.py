@@ -20,6 +20,13 @@ HIPAA_PING_HEADER_NAME = "HTTP_" + "X-HIPAA-PING".replace("-", "_")
 # the amount of time before an automatic logout should happen
 AUTOMATIC_LOGOUT_AFTER = getattr(settings, "AUTOMATIC_LOGOUT_AFTER", timedelta(minutes=15))
 
+# The amount of time before a pending automatic logout when a warning
+# should be shown to the user. For example, if AUTOMATIC_LOGOUT_AFTER is
+# set to 30 minutes and SHOW_LOGOUT_WARNING_BEFORE is set to 5
+# minutes, a warning will be shown to the user after 25 minutes of
+# inactivity.
+SHOW_LOGOUT_WARNING_BEFORE = getattr(settings, "SHOW_LOGOUT_WARNING_BEFORE", timedelta(seconds=60))
+
 # Unfortunately, for the two different user levels (is_staff=True and
 # is_staff=False) we have to have different password expiration policies
 REQUIRE_PASSWORD_RESET_AFTER = getattr(settings, "REQUIRE_PASSWORD_RESET_AFTER", timedelta(days=180))
@@ -62,6 +69,7 @@ class StillAliveMiddleware:
         # use exponential decay for the ping times, so as we get closer to
         # being logged out, we ping more often so we can detect activity
         seconds_until_next_ping = max(1, seconds_before_logout/2.0)
+        show_logout_warning_before = SHOW_LOGOUT_WARNING_BEFORE.total_seconds()
 
         # we don't need to ping for anonymous users
         if not request.user.is_authenticated():
@@ -73,7 +81,8 @@ class StillAliveMiddleware:
         if HIPAA_PING_HEADER_NAME in request.META:
             return JsonResponse({
                 "state": "authenticated" if request.user.is_authenticated() else "unauthenticated",
-                "seconds_until_next_ping": seconds_until_next_ping
+                "seconds_until_next_ping": seconds_until_next_ping,
+                "show_logout_warning_before": show_logout_warning_before,
             })
         else:
             # nothing to do
