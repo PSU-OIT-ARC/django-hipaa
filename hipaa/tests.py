@@ -13,10 +13,10 @@ from django.utils.timezone import now
 from model_mommy.mommy import make
 
 from .forms import (
-    authentication_form_clean,
     AuthenticationForm,
-    get_logger,
     SetPasswordForm,
+    authentication_form_clean,
+    get_logger,
 )
 from .middleware import (
     REQUIRE_PASSWORD_RESET_AFTER,
