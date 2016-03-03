@@ -90,25 +90,50 @@ class StillAliveMiddleware:
 
 
 class RequirePasswordChangeMiddleware:
+
+    """Requires users to change their passwords periodically.
+
+    The settings which determine when a password change is required are:
+
+        - REQUIRE_PASSWORD_RESET_AFTER
+        - REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER
+
     """
-    This requires users to reset their password every so often
-    """
+
     def process_request(self, request):
-        # if the user is cloaked (thanks to the django-cloak middleware),
-        # bypass the password change stuff
-        if getattr(request.user, 'is_cloaked', False):
+        user = request.user
+
+        if getattr(user, 'is_cloaked', False):
             return None
 
-        Logger = get_logger()
-        # to prevent an infinite redirect, if they are logging out or on the
-        # password_change page, don't do anything (and of course, if they
-        # aren't authenticated, there is nothing to do)
-        if (request.user.is_authenticated() and request.path != reverse(logout) and request.path != reverse(password_change)):
-            # check to see if their password has changed in the last n days.
-            # Staff members (is_staff=True) have to reset their passwords more
-            # frequently (by default) than non staff users
-            duration = REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER if request.user.is_staff else REQUIRE_PASSWORD_RESET_AFTER
-            if not Logger.objects.filter(user=request.user, action=Log.PASSWORD_RESET, created_on__gt=(now()-duration)).exists():
-                return redirect(password_change)
+        if not user.is_authenticated():
+            return None
 
-        return None
+        # To prevent an infinite redirect, if the user is logging out or
+        # on the password change page, don't do anything.
+        logout_path = reverse(logout)
+        password_change_path = reverse(password_change)
+        if request.path in (logout_path, password_change_path):
+            return None
+
+        logger_model = get_logger()
+
+        if user.is_staff:
+            duration = REQUIRE_PASSWORD_RESET_FOR_STAFF_AFTER
+        else:
+            duration = REQUIRE_PASSWORD_RESET_AFTER
+
+        # User must have a password reset log record that was created at
+        # or after this time.
+        threshold = now() - duration
+        has_password_reset_record = (
+            logger_model
+            .objects
+            .filter(user=user, action=Log.PASSWORD_RESET, created_on__gt=threshold)
+            .exists()
+        )
+
+        if has_password_reset_record:
+            return None
+
+        return redirect(password_change)
